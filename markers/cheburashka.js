@@ -1,23 +1,20 @@
 /**
- * Модуль маркера Чебурашки - ДОЖДЬ АПЕЛЬСИНОВ
- * 8 апельсинов падают с высоты и отскакивают, образуя круг
+ * Модуль маркера - простое отображение GLB с анимацией
  */
 
 class CheburashkaMarker {
     constructor(targetIndex = 0) {
         this.targetIndex = targetIndex;
         this.entity = null;
-        this.oranges = [];
+        this.model = null;
         this.isActive = false;
-        this.animationStarted = false;
-        this.objectsReady = false;
     }
 
     /**
      * Инициализация маркера
      */
     init() {
-        console.log('Инициализация дождя апельсинов...');
+        console.log('Инициализация AR модели...');
         
         if (document.readyState !== 'complete') {
             window.addEventListener('load', () => this.init());
@@ -27,7 +24,7 @@ class CheburashkaMarker {
         this.createMarkerEntity();
         this.setupEventListeners();
         
-        console.log('Дождь апельсинов готов!');
+        console.log('AR модель готова!');
     }
 
     /**
@@ -43,93 +40,50 @@ class CheburashkaMarker {
             
             const scene = document.querySelector('#ar-scene');
             scene.appendChild(this.entity);
-            
-            this.entity.addEventListener('loaded', () => {
-                console.log('Entity загружен, создаем 8 апельсинов...');
-                setTimeout(() => this.createOrangesWhenReady(), 100);
-            });
         }
+
+        // Создаем GLB модель с анимацией
+        this.createModel();
     }
 
     /**
-     * Создание апельсинов когда entity готов
+     * Создание GLB модели
      */
-    createOrangesWhenReady() {
-        if (!this.entity.object3D) {
-            setTimeout(() => this.createOrangesWhenReady(), 100);
-            return;
-        }
-
-        this.createOrangeRain();
-        this.objectsReady = true;
-        console.log('8 апельсинов созданы и готовы к дождю!');
-    }
-
-    /**
-     * Создание 8 апельсинов в хаотичном круговом порядке
-     */
-    createOrangeRain() {
-        // 8 апельсинов в кругу - стартовые позиции ВЫСОКО (чтобы не видно)
-        const orangeCount = 8;
-        const startHeight = 2.5; // Очень высоко, за пределами видимости
-        const circleRadius = 0.5; // УВЕЛИЧЕННЫЙ радиус круга приземления
-
-        for (let i = 0; i < orangeCount; i++) {
-            const angle = (i / orangeCount) * 2 * Math.PI;
-            
-            // Финальная позиция - круг с ХАОТИЧНОСТЬЮ
-            const baseX = Math.cos(angle) * circleRadius;
-            const baseZ = Math.sin(angle) * circleRadius;
-            
-            // Добавляем случайное смещение для хаотичности
-            const randomOffsetX = (Math.random() - 0.5) * 0.3; // ±0.15
-            const randomOffsetZ = (Math.random() - 0.5) * 0.3; // ±0.15
-            const randomOffsetY = (Math.random() - 0.5) * 0.1; // ±0.05 высота пола
-            
-            const landX = baseX + randomOffsetX;
-            const landZ = baseZ + randomOffsetZ;
-            const landY = -0.4 + randomOffsetY; // Пол с небольшими вариациями
-
-            // ВАЖНО: Стартовая позиция УЖЕ в правильных X,Z координатах!
-            const startX = landX; // Те же X,Z что и финальные
-            const startZ = landZ; // Те же X,Z что и финальные
-
-            const orange = this.createSingleOrange(
-                i,
-                `${startX} ${startHeight} ${startZ}`,
-                `${landX} ${landY} ${landZ}`
-            );
-            
-            this.entity.appendChild(orange);
-            this.oranges.push(orange);
-        }
-    }
-
-    /**
-     * Создание одного апельсина
-     */
-    createSingleOrange(index, startPos, landPos) {
-        const orange = document.createElement('a-sphere');
+    createModel() {
+        this.model = document.createElement('a-gltf-model');
         
-        // Атрибуты апельсина
-        orange.setAttribute('radius', '0.06'); // Чуть меньше, чтобы не мешали друг другу
-        orange.setAttribute('color', '#ff6600');
-        orange.setAttribute('position', startPos);
-        orange.setAttribute('visible', 'false');
-        orange.setAttribute('material', {
-            roughness: 0.7,
-            metalness: 0.1,
-            emissive: '#ff3300',
-            emissiveIntensity: 0.05
+        // Путь к модели
+        this.model.setAttribute('src', './assets/robot-zayac.glb');
+        
+        // Позиция и масштаб
+        this.model.setAttribute('position', '0 0 0');
+        this.model.setAttribute('scale', '1 1 1');
+        this.model.setAttribute('rotation', '0 0 0');
+        
+        // Включаем проигрывание анимации зациклено
+        this.model.setAttribute('animation-mixer', {
+            clip: '*',           // Все анимации из GLB
+            loop: 'repeat',      // Зацикленно
+            timeScale: 1         // Нормальная скорость
         });
         
-        orange.id = `orange-rain-${this.targetIndex}-${index}`;
+        // Изначально скрыто
+        this.model.setAttribute('visible', 'false');
         
-        // Сохраняем позицию приземления
-        orange.setAttribute('data-land-position', landPos);
-        orange.setAttribute('data-start-position', startPos);
+        // Добавляем в entity
+        this.entity.appendChild(this.model);
         
-        return orange;
+        console.log('GLB модель robot-zayac.glb добавлена');
+        
+        // Обработчик успешной загрузки
+        this.model.addEventListener('model-loaded', () => {
+            console.log('✅ Модель robot-zayac.glb загружена успешно!');
+        });
+        
+        // Обработчик ошибки загрузки
+        this.model.addEventListener('model-error', (error) => {
+            console.error('❌ Ошибка загрузки robot-zayac.glb:', error);
+        });
     }
 
     /**
@@ -137,175 +91,33 @@ class CheburashkaMarker {
      */
     setupEventListeners() {
         this.entity.addEventListener('targetFound', () => {
-            console.log('Маркер найден! Запускаем дождь апельсинов!');
+            console.log('✅ Маркер найден! Показываем модель');
             this.onTargetFound();
         });
 
         this.entity.addEventListener('targetLost', () => {
-            console.log('Маркер потерян! Останавливаем дождь.');
+            console.log('❌ Маркер потерян! Скрываем модель');
             this.onTargetLost();
         });
     }
 
     /**
-     * Обработчик обнаружения маркера - ДОЖДЬ НАЧИНАЕТСЯ!
+     * Обработчик обнаружения маркера
      */
     onTargetFound() {
         this.isActive = true;
         
-        if (!this.objectsReady) {
-            setTimeout(() => {
-                if (this.isActive) this.onTargetFound();
-            }, 200);
-            return;
+        if (this.model) {
+            // Показываем модель
+            this.model.setAttribute('visible', 'true');
+            
+            // Перезапускаем анимацию с начала
+            this.model.setAttribute('animation-mixer', {
+                clip: '*',
+                loop: 'repeat',
+                timeScale: 1
+            });
         }
-
-        console.log('Начинаем дождь из апельсинов!');
-        
-        // Показываем все апельсины сразу
-        this.showAllOranges();
-        
-        // Через 0.5 сек начинаем дождь (успеют появиться)
-        setTimeout(() => {
-            if (this.isActive) {
-                this.startOrangeRain();
-            }
-        }, 500);
-    }
-
-    /**
-     * Показываем все апельсины сразу
-     */
-    showAllOranges() {
-        this.oranges.forEach((orange, index) => {
-            if (!orange || !orange.parentNode) return;
-            
-            // Небольшая задержка для каждого апельсина (эффект появления)
-            setTimeout(() => {
-                if (!this.isActive) return;
-                orange.setAttribute('visible', 'true');
-            }, index * 50); // Быстрое появление
-        });
-    }
-
-    /**
-     * Запуск дождя апельсинов с гравитацией и отскоками
-     */
-    startOrangeRain() {
-        if (!this.isActive || this.animationStarted) return;
-        
-        this.animationStarted = true;
-        console.log('Дождь апельсинов начался!');
-
-        // Запускаем падение всех апельсинов с небольшими задержками
-        this.oranges.forEach((orange, index) => {
-            if (!orange || !orange.parentNode) return;
-            
-            // Задержка между падениями - чтобы не все сразу
-            setTimeout(() => {
-                if (!this.isActive) return;
-                this.dropOrangeWithGravity(orange, index);
-            }, index * 100); // Быстрые интервалы
-        });
-    }
-
-    /**
-     * Падение одного апельсина с гравитацией и отскоками
-     */
-    dropOrangeWithGravity(orange, index) {
-        if (!orange || !orange.parentNode || !this.isActive) return;
-
-        const landPosition = orange.getAttribute('data-land-position');
-        const [landX, landY, landZ] = landPosition.split(' ').map(Number);
-        
-        const currentPos = orange.getAttribute('position');
-        const startY = parseFloat(currentPos.y);
-        
-        console.log(`Апельсин ${index + 1} падает с Y=${startY} до Y=${landY} в позиции X=${landX}, Z=${landZ}`);
-        
-        // ФАЗА 1: Быстрое падение ТОЛЬКО по Y (X,Z остаются неизменными)
-        orange.setAttribute('animation__fall', {
-            property: 'position.y',  // ТОЛЬКО Y координата!
-            from: startY,
-            to: landY,
-            dur: 1500, // Быстрое падение
-            easing: 'easeInQuad' // Ускоряющееся падение как гравитация
-        });
-        
-        // Вращение во время падения
-        orange.setAttribute('animation__spin', {
-            property: 'rotation',
-            to: '720 360 180', // Много вращений
-            dur: 1500,
-            easing: 'linear'
-        });
-        
-        // ФАЗА 2: Отскоки после приземления (1.5 сек спустя)
-        setTimeout(() => {
-            if (!this.isActive) return;
-            this.bounceOrange(orange, landX, landY, landZ);
-        }, 1500);
-    }
-
-    /**
-     * Отскоки апельсина после приземления - БЕЗ ИЗМЕНЕНИЯ X,Z координат
-     */
-    bounceOrange(orange, x, y, z) {
-        if (!orange || !orange.parentNode || !this.isActive) return;
-        
-        console.log(`Отскоки апельсина на позиции: ${x}, ${y}, ${z}`);
-        
-        // ВАЖНО: Устанавливаем финальную позицию ПЕРЕД отскоками
-        orange.setAttribute('position', `${x} ${y} ${z}`);
-        
-        // Первый отскок - только по Y, X и Z не трогаем!
-        setTimeout(() => {
-            if (!this.isActive) return;
-            orange.setAttribute('animation__bounce1', {
-                property: 'position.y',
-                from: y,
-                to: y + 0.15, // Высокий отскок
-                dur: 400,
-                easing: 'easeOutQuad',
-                dir: 'alternate',
-                loop: 1
-            });
-        }, 50);
-        
-        // Второй отскок - средний (через 0.45 сек)
-        setTimeout(() => {
-            if (!this.isActive) return;
-            orange.setAttribute('animation__bounce2', {
-                property: 'position.y',
-                from: y,
-                to: y + 0.08,
-                dur: 300,
-                easing: 'easeOutQuad',
-                dir: 'alternate',
-                loop: 1
-            });
-        }, 450);
-        
-        // Третий отскок - маленький (через 0.75 сек)
-        setTimeout(() => {
-            if (!this.isActive) return;
-            orange.setAttribute('animation__bounce3', {
-                property: 'position.y',
-                from: y,
-                to: y + 0.03,
-                dur: 200,
-                easing: 'easeOutQuad',
-                dir: 'alternate',
-                loop: 1
-            });
-        }, 750);
-        
-        // ФИНАЛ: Устанавливаем окончательную позицию после всех отскоков
-        setTimeout(() => {
-            if (!this.isActive) return;
-            orange.setAttribute('position', `${x} ${y} ${z}`);
-            console.log(`Апельсин финально остался на: ${x}, ${y}, ${z}`);
-        }, 1200);
     }
 
     /**
@@ -313,34 +125,11 @@ class CheburashkaMarker {
      */
     onTargetLost() {
         this.isActive = false;
-        this.resetOrangeRain();
-    }
-
-    /**
-     * Сброс дождя апельсинов
-     */
-    resetOrangeRain() {
-        this.animationStarted = false;
-        console.log('Сброс дождя апельсинов...');
         
-        this.oranges.forEach((orange, index) => {
-            if (!orange) return;
-            
-            // Останавливаем все анимации
-            orange.removeAttribute('animation__fall');
-            orange.removeAttribute('animation__spin');
-            orange.removeAttribute('animation__bounce1');
-            orange.removeAttribute('animation__bounce2');
-            orange.removeAttribute('animation__bounce3');
-            
-            // Скрываем
-            orange.setAttribute('visible', 'false');
-            
-            // Возвращаем в стартовую позицию
-            const startPos = orange.getAttribute('data-start-position');
-            orange.setAttribute('position', startPos);
-            orange.setAttribute('rotation', '0 0 0');
-        });
+        if (this.model) {
+            // Скрываем модель
+            this.model.setAttribute('visible', 'false');
+        }
     }
 
     /**
@@ -350,10 +139,8 @@ class CheburashkaMarker {
         return {
             targetIndex: this.targetIndex,
             isActive: this.isActive,
-            animationStarted: this.animationStarted,
-            objectsReady: this.objectsReady,
-            orangeCount: this.oranges.length,
-            type: 'orange_rain'
+            modelLoaded: this.model !== null,
+            type: 'glb_model'
         };
     }
 
@@ -364,10 +151,9 @@ class CheburashkaMarker {
         if (this.entity && this.entity.parentNode) {
             this.entity.parentNode.removeChild(this.entity);
         }
-        this.oranges = [];
+        this.model = null;
         this.entity = null;
-        this.objectsReady = false;
-        console.log('Дождь апельсинов удален');
+        console.log('AR модель удалена');
     }
 }
 
