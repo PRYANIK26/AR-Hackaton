@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Simple AR Photo</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        html {
+            height: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+        
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
+            touch-action: manipulation;
+        }
+
+        /* Предотвращение скролла */
+        html, body {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            -webkit-scrollbar: none;
+        }
+
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* AR Scene - занимает всю страницу */
+        #ar-scene {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            z-index: 1 !important;
+            overflow: hidden !important;
+        }
+        
+        /* Статус */
+        .status {
+            position: fixed;
+            top: env(safe-area-inset-top, 20px);
+            top: max(env(safe-area-inset-top), 20px);
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            text-align: center;
+            max-width: calc(100vw - 40px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        /* Кнопка фото */
+        .photo-button {
+            position: fixed;
+            bottom: env(safe-area-inset-bottom, 30px);
+            bottom: max(env(safe-area-inset-bottom, 30px), 30px);
+            left: 50%;
+            transform: translateX(-50%) translateZ(0);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.95);
+            border: 4px solid #fff;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            will-change: transform;
+            touch-action: manipulation;
+        }
+        
+        .photo-button:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateX(-50%) scale(1.05) translateZ(0);
+        }
+        
+        .photo-button:active {
+            transform: translateX(-50%) scale(0.95) translateZ(0);
+            transition: all 0.1s ease;
+        }
+        
+        /* Флеш эффект */
+        .photo-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            height: 100vh;
+            height: 100dvh;
+            background: white;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+            transform: translateZ(0);
+        }
+        
+        /* Превью фото */
+        .photo-preview {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateZ(0);
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 140px);
+            max-height: calc(100dvh - 140px);
+            border: 4px solid white;
+            border-radius: 12px;
+            z-index: 3000;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            will-change: transform;
+        }
+        
+        /* Контролы превью */
+        .preview-controls {
+            position: fixed;
+            bottom: env(safe-area-inset-bottom, 20px);
+            bottom: max(env(safe-area-inset-bottom, 20px), 20px);
+            left: 50%;
+            transform: translateX(-50%) translateZ(0);
+            z-index: 3000;
+            display: none;
+            gap: 15px;
+            will-change: transform;
+        }
+        
+        .preview-controls button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 100px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            touch-action: manipulation;
+            transform: translateZ(0);
+            will-change: transform;
+        }
+        
+        .save-btn {
+            background: rgba(76, 175, 80, 0.95);
+            color: white;
+        }
+        
+        .close-btn {
+            background: rgba(244, 67, 54, 0.95);
+            color: white;
+        }
+        
+        .save-btn:hover {
+            background: rgba(69, 160, 73, 1);
+            transform: scale(1.05) translateZ(0);
+        }
+        
+        .close-btn:hover {
+            background: rgba(218, 25, 11, 1);
+            transform: scale(1.05) translateZ(0);
+        }
+
+        .save-btn:active,
+        .close-btn:active {
+            transform: scale(0.95) translateZ(0);
+            transition: all 0.1s ease;
+        }
+        
+        /* UI элементы */
+        .ui-elements {
+            transition: opacity 0.3s ease;
+            position: relative;
+            z-index: 999;
+        }
+        
+        .hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Медиа запросы для мобильных устройств */
+        @media screen and (max-width: 768px) {
+            .status {
+                font-size: 12px;
+                padding: 10px 14px;
+                top: env(safe-area-inset-top, 15px);
+                top: max(env(safe-area-inset-top), 15px);
+            }
+
+            .photo-button {
+                width: 70px;
+                height: 70px;
+                font-size: 24px;
+                bottom: env(safe-area-inset-bottom, 25px);
+                bottom: max(env(safe-area-inset-bottom, 25px), 25px);
+            }
+
+            .preview-controls button {
+                padding: 12px 20px;
+                font-size: 14px;
+                min-width: 80px;
+            }
+
+            .photo-preview {
+                max-width: calc(100vw - 20px);
+                max-height: calc(100vh - 120px);
+                max-height: calc(100dvh - 120px);
+                border-width: 2px;
+            }
+        }
+
+        /* Специально для Android */
+        @media screen and (max-width: 480px) {
+            .status {
+                font-size: 11px;
+                padding: 8px 12px;
+            }
+
+            .photo-button {
+                width: 65px;
+                height: 65px;
+                font-size: 22px;
+            }
+
+            .preview-controls {
+                bottom: env(safe-area-inset-bottom, 15px);
+                bottom: max(env(safe-area-inset-bottom, 15px), 15px);
+            }
+
+            .preview-controls button {
+                padding: 10px 16px;
+                font-size: 13px;
+                min-width: 70px;
+            }
+        }
+
+        /* Предотвращение выделения текста и контекстного меню */
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Обеспечиваем правильную работу на iOS */
+        @supports (-webkit-appearance: none) {
+            body {
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ui-elements">
+        <div class="status" id="status">Инициализация AR...</div>
+        
+        <button class="photo-button" onclick="takePhotoAlternative()">
+            📷
+        </button>
+    </div>
+    
+    <div class="photo-flash" id="photoFlash"></div>
+    
+    <img class="photo-preview" id="photoPreview" />
+    
+    <div class="preview-controls" id="previewControls">
+        <button class="save-btn" onclick="savePhoto()">Сохранить</button>
+        <button class="close-btn" onclick="closePreview()">Закрыть</button>
+    </div>
+
+    <!-- AR Scene - теперь без хардкода маркеров -->
+    <a-scene id="ar-scene" 
+             mindar-image="imageTargetSrc: ./assets/cheburashka.mind;" 
+             color-space="sRGB" 
+             renderer="colorManagement: true, physicallyCorrectLights, antialias: true" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: false"
+             embedded>
+             
+      <!-- Ассеты остаются для обратной совместимости -->
+      <a-assets>
+        <img id="card" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.png" />
+        <a-asset-item id="avatarModel" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/softmind/scene.gltf"></a-asset-item>
+      </a-assets>
+
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- Маркеры будут создаваться динамически через модули -->
+    </a-scene>
+
+    <!-- Подключаем модули маркеров -->
+    <script src="./markers/cheburashka.js"></script>
+
+<script>
+let currentPhotoData = null;
+let activeMarkers = {}; // Хранение активных маркеров
+
+// Предотвращение скролла и зума
+document.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+});
+
+// Предотвращение контекстного меню
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+});
+
+// Предотвращение двойного тапа для зума
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(event) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+
+// Обновление статуса
+function updateStatus(message) {
+    document.getElementById('status').textContent = message;
+}
+
+// Функция для создания снимка с AR эффектами
+async function takePhoto() {
+    try {
+        updateStatus('Создание AR фото...');
+        
+        // Скрываем UI
+        const uiElements = document.querySelector('.ui-elements');
+        uiElements.classList.add('hidden');
+        
+        // Ждем скрытия UI
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Показываем вспышку
+        const flash = document.getElementById('photoFlash');
+        flash.style.opacity = '0.7';
+        
+        const sceneEl = document.querySelector('#ar-scene');
+        
+        // Принудительно обновляем рендер
+        sceneEl.renderer.render(sceneEl.object3D, sceneEl.camera);
+        
+        // Получаем canvas от Three.js renderer
+        const webglCanvas = sceneEl.renderer.domElement;
+        
+        // Получаем размеры viewport (видимая область)
+        const rect = sceneEl.getBoundingClientRect();
+        const viewportWidth = rect.width;
+        const viewportHeight = rect.height;
+        
+        // Создаем финальный canvas с размерами viewport
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = viewportWidth;
+        finalCanvas.height = viewportHeight;
+        const finalCtx = finalCanvas.getContext('2d');
+        
+        // Устанавливаем параметры для четкости
+        finalCtx.imageSmoothingEnabled = false;
+        
+        // Копируем WebGL canvas в финальный canvas с правильными размерами
+        finalCtx.drawImage(
+            webglCanvas, 
+            0, 0, webglCanvas.width, webglCanvas.height,
+            0, 0, viewportWidth, viewportHeight
+        );
+        
+        // Создаем изображение
+        const dataURL = finalCanvas.toDataURL('image/png', 1.0);
+        
+        // Проверяем что получили не пустое изображение
+        if (dataURL === 'data:,' || dataURL.length < 1000) {
+            throw new Error('Пустой снимок WebGL canvas');
+        }
+        
+        currentPhotoData = dataURL;
+        
+        // Убираем вспышку
+        setTimeout(() => {
+            flash.style.opacity = '0';
+        }, 100);
+        
+        // Показываем превью
+        const preview = document.getElementById('photoPreview');
+        const controls = document.getElementById('previewControls');
+        
+        preview.src = dataURL;
+        preview.style.display = 'block';
+        controls.style.display = 'flex';
+        
+        updateStatus('AR фото готово!');
+        
+    } catch (error) {
+        console.error('Ошибка создания AR фото:', error);
+        updateStatus('Ошибка AR фото: ' + error.message);
+        
+        // Пробуем композитный метод как fallback
+        try {
+            await takeCompositePhoto();
+        } catch (e) {
+            // Показываем UI обратно в случае ошибки
+            const uiElements = document.querySelector('.ui-elements');
+            uiElements.classList.remove('hidden');
+            
+            const flash = document.getElementById('photoFlash');
+            flash.style.opacity = '0';
+        }
+    }
+}
+
+// Композитный метод - смешиваем видео + AR рендер с точными размерами
+async function takeCompositePhoto() {
+    try {
+        updateStatus('Создание композитного фото...');
+        
+        const sceneEl = document.querySelector('#ar-scene');
+        
+        // Получаем точные размеры AR viewport
+        const rect = sceneEl.getBoundingClientRect();
+        const viewportWidth = Math.floor(rect.width);
+        const viewportHeight = Math.floor(rect.height);
+        
+        console.log(`Viewport размеры: ${viewportWidth}x${viewportHeight}`);
+        
+        // Создаем финальный canvas ТОЧНО по размерам viewport
+        const compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = viewportWidth;
+        compositeCanvas.height = viewportHeight;
+        const ctx = compositeCanvas.getContext('2d');
+        
+        // Черный фон на случай проблем
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+        
+        // 1. Рисуем видео фон с правильным кадрированием (как в AR)
+        const video = document.querySelector('video');
+        if (video && video.videoWidth > 0) {
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            
+            console.log(`Видео размеры: ${videoWidth}x${videoHeight}`);
+            
+            // Вычисляем масштабирование как CSS object-fit: cover
+            const videoAspect = videoWidth / videoHeight;
+            const viewportAspect = viewportWidth / viewportHeight;
+            
+            let sourceX = 0, sourceY = 0, sourceWidth = videoWidth, sourceHeight = videoHeight;
+            
+            if (videoAspect > viewportAspect) {
+                // Видео шире viewport - обрезаем по ширине (как в AR)
+                sourceWidth = videoHeight * viewportAspect;
+                sourceX = (videoWidth - sourceWidth) / 2;
+            } else {
+                // Видео выше viewport - обрезаем по высоте (как в AR)
+                sourceHeight = videoWidth / viewportAspect;
+                sourceY = (videoHeight - sourceHeight) / 2;
+            }
+            
+            console.log(`Кадрирование видео: ${sourceX}, ${sourceY}, ${sourceWidth}, ${sourceHeight}`);
+            
+            // Рисуем обрезанное видео на весь canvas
+            ctx.drawImage(
+                video,
+                sourceX, sourceY, sourceWidth, sourceHeight,  // source rect (обрезанная часть видео)
+                0, 0, viewportWidth, viewportHeight           // dest rect (весь canvas)
+            );
+        }
+        
+        // 2. Накладываем AR рендер ТОЧНО по размерам
+        const webglCanvas = sceneEl.renderer.domElement;
+        
+        // Принудительно рендерим текущий кадр
+        sceneEl.renderer.render(sceneEl.object3D, sceneEl.camera);
+        
+        console.log(`WebGL Canvas размеры: ${webglCanvas.width}x${webglCanvas.height}`);
+        
+        // Накладываем AR рендер поверх видео с точным масштабированием
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(
+            webglCanvas,
+            0, 0, webglCanvas.width, webglCanvas.height,    // весь WebGL canvas
+            0, 0, viewportWidth, viewportHeight             // точно по размерам viewport
+        );
+        
+        const dataURL = compositeCanvas.toDataURL('image/png', 1.0);
+        currentPhotoData = dataURL;
+        
+        console.log(`Финальное фото: ${viewportWidth}x${viewportHeight}`);
+        
+        // Показываем превью
+        const preview = document.getElementById('photoPreview');
+        const controls = document.getElementById('previewControls');
+        
+        preview.src = dataURL;
+        preview.style.display = 'block';
+        controls.style.display = 'flex';
+        
+        updateStatus('Композитное фото готово!');
+        
+    } catch (error) {
+        console.error('Ошибка композитного фото:', error);
+        throw error;
+    }
+}
+
+// Альтернативная функция - композитный метод (более надежный)
+async function takePhotoAlternative() {
+    try {
+        updateStatus('Создание AR фото (метод 2)...');
+        
+        // Скрываем UI
+        const uiElements = document.querySelector('.ui-elements');
+        uiElements.classList.add('hidden');
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Вспышка
+        const flash = document.getElementById('photoFlash');
+        flash.style.opacity = '0.7';
+        
+        // Принудительно вызываем композитный метод
+        await takeCompositePhoto();
+        
+        // Убираем вспышку
+        setTimeout(() => {
+            flash.style.opacity = '0';
+        }, 100);
+        
+    } catch (error) {
+        console.error('Ошибка альтернативного AR фото:', error);
+        updateStatus('Ошибка альтернативного AR фото: ' + error.message);
+        
+        const uiElements = document.querySelector('.ui-elements');
+        uiElements.classList.remove('hidden');
+        
+        const flash = document.getElementById('photoFlash');
+        flash.style.opacity = '0';
+    }
+}
+
+function savePhoto() {
+    if (!currentPhotoData) return;
+    
+    try {
+        // Создаем ссылку для скачивания
+        const link = document.createElement('a');
+        link.download = `ar-photo-${new Date().getTime()}.png`;
+        link.href = currentPhotoData;
+        
+        // Симулируем клик для скачивания
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        updateStatus('Фото сохранено!');
+        closePreview();
+        
+    } catch (error) {
+        console.error('Ошибка сохранения:', error);
+        updateStatus('Ошибка сохранения');
+    }
+}
+
+// Закрытие превью
+function closePreview() {
+    const preview = document.getElementById('photoPreview');
+    const controls = document.getElementById('previewControls');
+    const uiElements = document.querySelector('.ui-elements');
+    
+    preview.style.display = 'none';
+    controls.style.display = 'none';
+    uiElements.classList.remove('hidden');
+    
+    currentPhotoData = null;
+    updateStatus('Наведите камеру на маркер');
+}
+
+// Инициализация маркеров
+function initializeMarkers() {
+    console.log('Инициализация маркеров...');
+    
+    // Инициализируем маркер Чебурашки
+    if (typeof CheburashkaMarker !== 'undefined') {
+        activeMarkers.cheburashka = new CheburashkaMarker(0);
+        activeMarkers.cheburashka.init();
+        console.log('Маркер Чебурашки инициализирован');
+    } else {
+        console.error('Модуль CheburashkaMarker не найден!');
+    }
+    
+    updateStatus('Маркеры загружены. Наведите камеру на маркер');
+}
+
+// Инициализация AR
+document.addEventListener('DOMContentLoaded', () => {
+    const sceneEl = document.querySelector('#ar-scene');
+    
+    sceneEl.addEventListener('renderstart', () => {
+        updateStatus('AR инициализирован');
+        
+        // Инициализируем маркеры после готовности AR
+        setTimeout(() => {
+            initializeMarkers();
+        }, 1000);
+    });
+    
+    // Обработчик ошибок AR
+    sceneEl.addEventListener('error', (event) => {
+        console.error('AR Error:', event);
+        updateStatus('Ошибка AR');
+    });
+});
+
+// Обработка ошибок
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    updateStatus('Ошибка приложения');
+});
+
+// Обработка клавиш (пробел для фото)
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+        event.preventDefault();
+        
+        // Проверяем, не открыто ли превью
+        const preview = document.getElementById('photoPreview');
+        if (preview.style.display === 'block') {
+            closePreview();
+        } else {
+            takePhotoAlternative();
+        }
+    }
+    
+    if (event.code === 'Enter' && currentPhotoData) {
+        event.preventDefault();
+        savePhoto();
+    }
+    
+    if (event.code === 'Escape') {
+        event.preventDefault();
+        closePreview();
+    }
+});
+
+// Предотвращение случайного закрытия страницы
+window.addEventListener('beforeunload', (event) => {
+    if (currentPhotoData) {
+        event.preventDefault();
+        event.returnValue = '';
+    }
+});
+
+// Функции для отладки маркеров
+function getMarkersStatus() {
+    const status = {};
+    Object.keys(activeMarkers).forEach(key => {
+        if (activeMarkers[key] && typeof activeMarkers[key].getStatus === 'function') {
+            status[key] = activeMarkers[key].getStatus();
+        }
+    });
+    console.log('Статус маркеров:', status);
+    return status;
+}
+
+// Экспорт для отладки
+window.activeMarkers = activeMarkers;
+window.getMarkersStatus = getMarkersStatus;
+</script>
+</body>
+</html>
